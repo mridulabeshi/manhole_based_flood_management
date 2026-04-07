@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Drainage Dashboard</title>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <style>
+    body {
+      margin:0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: white;
+    }
+
+    h1 {
+      text-align:center;
+      padding:15px;
+    }
+
+    .topbar {
+      text-align:center;
+      margin-bottom:10px;
+    }
+
+    button {
+      padding:10px 20px;
+      border:none;
+      border-radius:8px;
+      background:#38bdf8;
+      color:black;
+      font-weight:bold;
+      cursor:pointer;
+    }
+
+    button:hover {
+      background:#0ea5e9;
+    }
+
+    #network {
+      width: 90%;
+      height: 420px;
+      margin:auto;
+      border-radius:12px;
+      background:#020617;
+    }
+
+    .legend {
+      text-align:center;
+      margin:10px;
+    }
+
+    .box {
+      display:inline-block;
+      padding:5px 10px;
+      margin:5px;
+      border-radius:5px;
+    }
+
+    .normal { background:green; }
+    .warning { background:orange; }
+    .overflow { background:red; }
+
+    .cards {
+      display:flex;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+
+    .card {
+      margin:10px;
+      padding:15px;
+      border-radius:12px;
+      width:150px;
+      text-align:center;
+      font-weight:bold;
+    }
+
+    #alertBox {
+      text-align:center;
+      color:red;
+      font-weight:bold;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🌊 Smart Manhole Drainage System</h1>
+
+<div class="topbar">
+  <button onclick="toggleRain()">🌧️ Toggle Rain</button>
+</div>
+
+<div id="alertBox"></div>
+
+<div id="network"></div>
+
+<div class="legend">
+  <span class="box normal">Normal</span>
+  <span class="box warning">Warning</span>
+  <span class="box overflow">Overflow</span>
+</div>
+
+<div class="cards" id="cards"></div>
+
+<script>
+
+// NETWORK STRUCTURE (more complex)
+const nodes = new vis.DataSet([
+  {id:1,label:"MH1",x:-200,y:0},
+  {id:2,label:"MH2",x:-100,y:100},
+  {id:3,label:"MH3",x:0,y:0},
+  {id:4,label:"MH4",x:100,y:100},
+  {id:5,label:"MH5",x:200,y:0},
+  {id:6,label:"MH6",x:0,y:-120}
+]);
+
+const edges = new vis.DataSet([
+  {from:1,to:2},{from:2,to:3},{from:3,to:4},
+  {from:4,to:5},{from:3,to:6},{from:6,to:1}
+]);
+
+const container = document.getElementById("network");
+
+const network = new vis.Network(container, {nodes,edges}, {
+  physics:false,
+  nodes:{shape:"dot",size:22,font:{color:"white"}},
+  edges:{color:"#64748b"}
+});
+
+// STATE
+let rain = false;
+let levels = {
+  1:20,2:30,3:25,4:40,5:35,6:20
+};
+
+// STATUS FUNCTION
+function getStatus(level){
+  if(level < 40) return "normal";
+  if(level < 70) return "warning";
+  return "overflow";
+}
+
+// RAIN TOGGLE
+function toggleRain(){
+  rain = !rain;
+}
+
+// UPDATE LOOP
+function update(){
+  let alertText = "";
+  let cardsHTML = "";
+
+  for(let id in levels){
+
+    // RAIN EFFECT
+    if(rain){
+      levels[id] += Math.random()*5;
+    } else {
+      levels[id] -= Math.random()*2;
+    }
+
+    // LIMIT
+    levels[id] = Math.max(10, Math.min(100, levels[id]));
+
+    let level = Math.floor(levels[id]);
+    let status = getStatus(level);
+
+    // COLOR
+    let color = "green";
+    if(status==="warning") color="orange";
+    if(status==="overflow"){
+      color="red";
+      alertText += `⚠ Overflow at MH${id} | `;
+    }
+
+    // UPDATE NODE
+    nodes.update({
+      id: parseInt(id),
+      label:`MH${id}\n${level}%`,
+      color: color
+    });
+
+    // CARD UI
+    cardsHTML += `
+      <div class="card ${status}">
+        MH${id}<br>${level}%<br>${status.toUpperCase()}
+      </div>
+    `;
+  }
+
+  document.getElementById("cards").innerHTML = cardsHTML;
+  document.getElementById("alertBox").innerText = alertText;
+}
+
+setInterval(update,2000);
+
+</script>
+
+</body>
+</html>
