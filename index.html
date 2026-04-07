@@ -1,196 +1,189 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Drainage Dashboard</title>
+  <title>Smart Drainage System</title>
   <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
   <style>
     body {
       margin:0;
-      font-family: 'Segoe UI', sans-serif;
-      background: #0f172a;
-      color: white;
+      font-family:'Segoe UI';
+      background:#0f172a;
+      color:white;
+      text-align:center;
     }
 
-    h1 {
-      text-align:center;
-      padding:15px;
-    }
-
-    .topbar {
-      text-align:center;
-      margin-bottom:10px;
+    #network {
+      height:450px;
+      margin:20px;
+      border-radius:10px;
+      background:#020617;
     }
 
     button {
       padding:10px 20px;
+      margin:10px;
       border:none;
       border-radius:8px;
       background:#38bdf8;
-      color:black;
-      font-weight:bold;
       cursor:pointer;
+      font-weight:bold;
     }
 
-    button:hover {
-      background:#0ea5e9;
-    }
-
-    #network {
-      width: 90%;
-      height: 420px;
-      margin:auto;
-      border-radius:12px;
-      background:#020617;
-    }
-
-    .legend {
-      text-align:center;
-      margin:10px;
-    }
-
-    .box {
+    .card {
       display:inline-block;
-      padding:5px 10px;
-      margin:5px;
-      border-radius:5px;
+      padding:10px;
+      margin:8px;
+      border-radius:10px;
+      width:120px;
     }
 
     .normal { background:green; }
     .warning { background:orange; }
     .overflow { background:red; }
 
-    .cards {
-      display:flex;
-      justify-content:center;
-      flex-wrap:wrap;
-    }
-
-    .card {
+    #recommend {
       margin:10px;
-      padding:15px;
-      border-radius:12px;
-      width:150px;
-      text-align:center;
-      font-weight:bold;
-    }
-
-    #alertBox {
-      text-align:center;
-      color:red;
-      font-weight:bold;
+      font-size:18px;
+      color:#38bdf8;
     }
   </style>
 </head>
 
 <body>
 
-<h1>🌊 Smart Manhole Drainage System</h1>
+<h1>🌊 Smart Manhole System</h1>
+<button onclick="toggleRain()">🌧 Toggle Rain</button>
 
-<div class="topbar">
-  <button onclick="toggleRain()">🌧️ Toggle Rain</button>
-</div>
-
-<div id="alertBox"></div>
+<div id="recommend">Recommended Path: --</div>
 
 <div id="network"></div>
 
-<div class="legend">
-  <span class="box normal">Normal</span>
-  <span class="box warning">Warning</span>
-  <span class="box overflow">Overflow</span>
-</div>
-
-<div class="cards" id="cards"></div>
+<div id="cards"></div>
 
 <script>
 
-// NETWORK STRUCTURE (more complex)
+// CREATE 15 NODES (GRID)
 const nodes = new vis.DataSet([
-  {id:1,label:"MH1",x:-200,y:0},
-  {id:2,label:"MH2",x:-100,y:100},
-  {id:3,label:"MH3",x:0,y:0},
-  {id:4,label:"MH4",x:100,y:100},
-  {id:5,label:"MH5",x:200,y:0},
-  {id:6,label:"MH6",x:0,y:-120}
-]);
+{id:1,x:-300,y:-150},{id:2,x:-150,y:-150},{id:3,x:0,y:-150},{id:4,x:150,y:-150},{id:5,x:300,y:-150},
+{id:6,x:-300,y:0},{id:7,x:-150,y:0},{id:8,x:0,y:0},{id:9,x:150,y:0},{id:10,x:300,y:0},
+{id:11,x:-300,y:150},{id:12,x:-150,y:150},{id:13,x:0,y:150},{id:14,x:150,y:150},{id:15,x:300,y:150}
+].map(n => ({...n,label:"MH"+n.id})));
 
+// CONNECTIONS (GRID NETWORK)
 const edges = new vis.DataSet([
-  {from:1,to:2},{from:2,to:3},{from:3,to:4},
-  {from:4,to:5},{from:3,to:6},{from:6,to:1}
+{from:1,to:2},{from:2,to:3},{from:3,to:4},{from:4,to:5},
+{from:6,to:7},{from:7,to:8},{from:8,to:9},{from:9,to:10},
+{from:11,to:12},{from:12,to:13},{from:13,to:14},{from:14,to:15},
+
+{from:1,to:6},{from:6,to:11},
+{from:2,to:7},{from:7,to:12},
+{from:3,to:8},{from:8,to:13},
+{from:4,to:9},{from:9,to:14},
+{from:5,to:10},{from:10,to:15}
 ]);
 
-const container = document.getElementById("network");
-
-const network = new vis.Network(container, {nodes,edges}, {
-  physics:false,
-  nodes:{shape:"dot",size:22,font:{color:"white"}},
-  edges:{color:"#64748b"}
-});
+const network = new vis.Network(
+  document.getElementById("network"),
+  {nodes,edges},
+  {physics:false, nodes:{shape:"dot",size:18,font:{color:"white"}}}
+);
 
 // STATE
 let rain = false;
-let levels = {
-  1:20,2:30,3:25,4:40,5:35,6:20
-};
+let levels = {};
+for(let i=1;i<=15;i++) levels[i] = Math.random()*40;
 
-// STATUS FUNCTION
-function getStatus(level){
-  if(level < 40) return "normal";
-  if(level < 70) return "warning";
+// STATUS
+function getStatus(l){
+  if(l<40) return "normal";
+  if(l<70) return "warning";
   return "overflow";
 }
 
-// RAIN TOGGLE
+// RAIN
 function toggleRain(){
   rain = !rain;
 }
 
+// PATH RECOMMENDATION (simple BFS avoiding overflow)
+function getSafePath(){
+  let graph = {};
+  edges.forEach(e=>{
+    if(!graph[e.from]) graph[e.from]=[];
+    if(!graph[e.to]) graph[e.to]=[];
+    graph[e.from].push(e.to);
+    graph[e.to].push(e.from);
+  });
+
+  let start = 1;
+  let target = 15;
+
+  let queue = [[start]];
+  let visited = new Set();
+
+  while(queue.length){
+    let path = queue.shift();
+    let node = path[path.length-1];
+
+    if(node===target) return path;
+
+    if(!visited.has(node)){
+      visited.add(node);
+
+      for(let nei of graph[node]){
+        // avoid overflow nodes
+        if(getStatus(levels[nei]) !== "overflow"){
+          queue.push([...path,nei]);
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 // UPDATE LOOP
 function update(){
-  let alertText = "";
   let cardsHTML = "";
 
-  for(let id in levels){
+  for(let i=1;i<=15;i++){
 
-    // RAIN EFFECT
-    if(rain){
-      levels[id] += Math.random()*5;
-    } else {
-      levels[id] -= Math.random()*2;
-    }
+    if(rain) levels[i]+=Math.random()*4;
+    else levels[i]-=Math.random()*2;
 
-    // LIMIT
-    levels[id] = Math.max(10, Math.min(100, levels[id]));
+    levels[i] = Math.max(10,Math.min(100,levels[i]));
 
-    let level = Math.floor(levels[id]);
+    let level = Math.floor(levels[i]);
     let status = getStatus(level);
 
-    // COLOR
-    let color = "green";
-    if(status==="warning") color="orange";
-    if(status==="overflow"){
-      color="red";
-      alertText += `⚠ Overflow at MH${id} | `;
-    }
+    let color = status==="normal"?"green":
+                status==="warning"?"orange":"red";
 
-    // UPDATE NODE
     nodes.update({
-      id: parseInt(id),
-      label:`MH${id}\n${level}%`,
-      color: color
+      id:i,
+      label:`MH${i}\n${level}%`,
+      color:color
     });
 
-    // CARD UI
     cardsHTML += `
       <div class="card ${status}">
-        MH${id}<br>${level}%<br>${status.toUpperCase()}
+        MH${i}<br>${level}%<br>${status}
       </div>
     `;
   }
 
   document.getElementById("cards").innerHTML = cardsHTML;
-  document.getElementById("alertBox").innerText = alertText;
+
+  // PATH
+  let path = getSafePath();
+  if(path){
+    document.getElementById("recommend").innerText =
+      "Recommended Path: " + path.map(n=>"MH"+n).join(" → ");
+  } else {
+    document.getElementById("recommend").innerText =
+      "No Safe Path Available!";
+  }
 }
 
 setInterval(update,2000);
