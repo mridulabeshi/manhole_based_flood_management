@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Manhole Dashboard</title>
+
+  <!-- vis.js -->
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      background:#111;
+      color:white;
+      text-align:center;
+    }
+
+    #network {
+      width: 90%;
+      height: 400px;
+      border: 1px solid white;
+      margin: auto;
+    }
+
+    .card {
+      padding:15px;
+      margin:10px;
+      border-radius:10px;
+      display:inline-block;
+      width:150px;
+    }
+
+    .normal { background:green; }
+    .warning { background:orange; }
+    .overflow { background:red; }
+  </style>
+</head>
+
+<body>
+
+<h1>Smart Manhole Monitoring System</h1>
+
+<!-- GRAPH -->
+<h2>Drainage Network</h2>
+<div id="network"></div>
+
+<!-- CARDS -->
+<h2>Live Status</h2>
+<div id="container"></div>
+
+<script>
+
+// MANHOLES
+const manholes = ["MH1","MH2","MH3","MH4","MH5"];
+
+// CONNECTIONS (edges)
+const edges = new vis.DataSet([
+  {from: "MH1", to: "MH2"},
+  {from: "MH2", to: "MH3"},
+  {from: "MH3", to: "MH4"},
+  {from: "MH4", to: "MH5"},
+  {from: "MH1", to: "MH5"}
+]);
+
+// NODES
+let nodes = new vis.DataSet(
+  manholes.map(mh => ({ id: mh, label: mh }))
+);
+
+// CREATE GRAPH
+const container = document.getElementById("network");
+const data = { nodes: nodes, edges: edges };
+
+const options = {
+  nodes: {
+    shape: "dot",
+    size: 20,
+    font: { color: "white" }
+  },
+  edges: {
+    color: "white"
+  },
+  physics: {
+    enabled: true
+  }
+};
+
+new vis.Network(container, data, options);
+
+
+// STATUS LOGIC
+function getStatus(level){
+  if(level < 40) return "normal";
+  if(level < 70) return "warning";
+  return "overflow";
+}
+
+// UPDATE FUNCTION
+function updateData(){
+  const container = document.getElementById("container");
+  container.innerHTML = "";
+
+  manholes.forEach(mh => {
+    let level = Math.floor(Math.random()*100);
+    let status = getStatus(level);
+
+    // UPDATE NODE COLOR
+    let color = "green";
+    if(status === "warning") color = "orange";
+    if(status === "overflow") color = "red";
+
+    nodes.update({
+      id: mh,
+      label: mh + "\n" + level + "%",
+      color: color
+    });
+
+    // CREATE CARD
+    let div = document.createElement("div");
+    div.className = "card " + status;
+    div.innerHTML = `
+      <h3>${mh}</h3>
+      <p>${level}%</p>
+      <p>${status.toUpperCase()}</p>
+    `;
+
+    // ALERT
+    if(status === "overflow"){
+      console.log("⚠ Overflow at " + mh);
+    }
+
+    container.appendChild(div);
+  });
+}
+
+// RUN EVERY 3s
+setInterval(updateData, 3000);
+
+</script>
+
+</body>
+</html>
