@@ -16,8 +16,8 @@
     #network {
       height:450px;
       margin:20px;
-      border-radius:10px;
       background:#020617;
+      border-radius:10px;
     }
 
     button {
@@ -30,23 +30,25 @@
       font-weight:bold;
     }
 
-    .card {
-      display:inline-block;
-      padding:10px;
-      margin:8px;
-      border-radius:10px;
-      width:120px;
-    }
-
-    .normal { background:green; }
-    .warning { background:orange; }
-    .overflow { background:red; }
-
     #recommend {
       margin:10px;
       font-size:18px;
       color:#38bdf8;
     }
+
+    /* INFO PANEL */
+    #infoPanel {
+      position:fixed;
+      right:20px;
+      top:80px;
+      width:250px;
+      background:#111827;
+      padding:15px;
+      border-radius:10px;
+      display:none;
+      text-align:left;
+    }
+
   </style>
 </head>
 
@@ -59,30 +61,37 @@
 
 <div id="network"></div>
 
-<div id="cards"></div>
+<!-- INFO PANEL -->
+<div id="infoPanel"></div>
 
 <script>
 
-// CREATE 15 NODES (GRID)
+// CREATE 15 NODES
 const nodes = new vis.DataSet([
-{id:1,x:-300,y:-150},{id:2,x:-150,y:-150},{id:3,x:0,y:-150},{id:4,x:150,y:-150},{id:5,x:300,y:-150},
-{id:6,x:-300,y:0},{id:7,x:-150,y:0},{id:8,x:0,y:0},{id:9,x:150,y:0},{id:10,x:300,y:0},
-{id:11,x:-300,y:150},{id:12,x:-150,y:150},{id:13,x:0,y:150},{id:14,x:150,y:150},{id:15,x:300,y:150}
+  {id:1,x:-320,y:-120},{id:2,x:-180,y:-180},{id:3,x:-20,y:-140},{id:4,x:150,y:-170},{id:5,x:300,y:-120},
+
+  {id:6,x:-350,y:20},{id:7,x:-180,y:40},{id:8,x:0,y:10},{id:9,x:160,y:60},{id:10,x:330,y:20},
+
+  {id:11,x:-300,y:180},{id:12,x:-120,y:160},{id:13,x:50,y:200},{id:14,x:220,y:170},{id:15,x:350,y:210}
 ].map(n => ({...n,label:"MH"+n.id})));
 
-// CONNECTIONS (GRID NETWORK)
+// EDGES (GRID)
 const edges = new vis.DataSet([
-{from:1,to:2},{from:2,to:3},{from:3,to:4},{from:4,to:5},
-{from:6,to:7},{from:7,to:8},{from:8,to:9},{from:9,to:10},
-{from:11,to:12},{from:12,to:13},{from:13,to:14},{from:14,to:15},
+  {from:1,to:2},{from:2,to:3},{from:3,to:4},{from:4,to:5},
 
-{from:1,to:6},{from:6,to:11},
-{from:2,to:7},{from:7,to:12},
-{from:3,to:8},{from:8,to:13},
-{from:4,to:9},{from:9,to:14},
-{from:5,to:10},{from:10,to:15}
+  {from:1,to:6},{from:2,to:7},{from:3,to:8},{from:4,to:9},{from:5,to:10},
+
+  {from:6,to:7},{from:7,to:8},{from:8,to:9},{from:9,to:10},
+
+  {from:6,to:11},{from:7,to:12},{from:8,to:13},{from:9,to:14},{from:10,to:15},
+
+  {from:11,to:12},{from:12,to:13},{from:13,to:14},{from:14,to:15},
+
+  // EXTRA cross links (important for realism)
+  {from:2,to:8},{from:7,to:3},{from:8,to:4},{from:9,to:13}
 ]);
 
+// NETWORK
 const network = new vis.Network(
   document.getElementById("network"),
   {nodes,edges},
@@ -91,8 +100,20 @@ const network = new vis.Network(
 
 // STATE
 let rain = false;
+
+// LEVELS
 let levels = {};
-for(let i=1;i<=15;i++) levels[i] = Math.random()*40;
+for(let i=1;i<=15;i++) levels[i] = 20 + Math.random()*20;
+
+// EXTRA DATA (for panel)
+function getDetails(id){
+  return {
+    serial: "SN-"+(1000+id),
+    volume: (50 + id*5) + " m³",
+    area: "Zone " + ((id%5)+1),
+    waterbody: ["River","Lake","Drain","Canal","None"][id%5]
+  };
+}
 
 // STATUS
 function getStatus(l){
@@ -101,58 +122,79 @@ function getStatus(l){
   return "overflow";
 }
 
-// RAIN
+// RAIN TOGGLE
 function toggleRain(){
   rain = !rain;
+  alert("Rain is now " + (rain ? "ON 🌧" : "OFF ☀"));
 }
 
-// PATH RECOMMENDATION (simple BFS avoiding overflow)
-function getSafePath(){
-  let graph = {};
+// CLICK EVENT (INFO PANEL)
+network.on("click", function(params){
+  if(params.nodes.length > 0){
+    let id = params.nodes[0];
+    let d = getDetails(id);
+
+    document.getElementById("infoPanel").style.display="block";
+    document.getElementById("infoPanel").innerHTML = `
+      <h3>MH${id}</h3>
+      <p><b>Serial:</b> ${d.serial}</p>
+      <p><b>Volume:</b> ${d.volume}</p>
+      <p><b>Area:</b> ${d.area}</p>
+      <p><b>Nearby Waterbody:</b> ${d.waterbody}</p>
+    `;
+  }
+});
+
+// GRAPH FOR PATH
+function buildGraph(){
+  let g={};
   edges.forEach(e=>{
-    if(!graph[e.from]) graph[e.from]=[];
-    if(!graph[e.to]) graph[e.to]=[];
-    graph[e.from].push(e.to);
-    graph[e.to].push(e.from);
+    if(!g[e.from]) g[e.from]=[];
+    if(!g[e.to]) g[e.to]=[];
+    g[e.from].push(e.to);
+    g[e.to].push(e.from);
   });
+  return g;
+}
 
-  let start = 1;
-  let target = 15;
+// PATH (BFS)
+function getPath(){
+  let g = buildGraph();
+  let q=[[1]];
+  let visited=new Set();
 
-  let queue = [[start]];
-  let visited = new Set();
+  while(q.length){
+    let path=q.shift();
+    let node=path[path.length-1];
 
-  while(queue.length){
-    let path = queue.shift();
-    let node = path[path.length-1];
-
-    if(node===target) return path;
+    if(node===15) return path;
 
     if(!visited.has(node)){
       visited.add(node);
 
-      for(let nei of graph[node]){
-        // avoid overflow nodes
-        if(getStatus(levels[nei]) !== "overflow"){
-          queue.push([...path,nei]);
+      for(let nei of g[node]){
+        if(getStatus(levels[nei])!=="overflow"){
+          q.push([...path,nei]);
         }
       }
     }
   }
-
   return null;
 }
 
 // UPDATE LOOP
 function update(){
-  let cardsHTML = "";
 
   for(let i=1;i<=15;i++){
 
-    if(rain) levels[i]+=Math.random()*4;
-    else levels[i]-=Math.random()*2;
+    // REALISTIC PHYSICS
+    if(rain){
+      levels[i] += 1 + Math.random()*2;  // rise
+    } else {
+      levels[i] -= 1 + Math.random()*1.5; // drain
+    }
 
-    levels[i] = Math.max(10,Math.min(100,levels[i]));
+    levels[i] = Math.max(5, Math.min(100, levels[i]));
 
     let level = Math.floor(levels[i]);
     let status = getStatus(level);
@@ -165,25 +207,13 @@ function update(){
       label:`MH${i}\n${level}%`,
       color:color
     });
-
-    cardsHTML += `
-      <div class="card ${status}">
-        MH${i}<br>${level}%<br>${status}
-      </div>
-    `;
   }
-
-  document.getElementById("cards").innerHTML = cardsHTML;
 
   // PATH
-  let path = getSafePath();
-  if(path){
-    document.getElementById("recommend").innerText =
-      "Recommended Path: " + path.map(n=>"MH"+n).join(" → ");
-  } else {
-    document.getElementById("recommend").innerText =
-      "No Safe Path Available!";
-  }
+  let p = getPath();
+  document.getElementById("recommend").innerText =
+    p ? "Recommended Path: " + p.map(n=>"MH"+n).join(" → ")
+      : "No Safe Path Available!";
 }
 
 setInterval(update,2000);
