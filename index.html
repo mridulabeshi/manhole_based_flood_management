@@ -236,10 +236,26 @@ function update(){
   }
 
   // PATH
+  // CHECK IF ALL ARE GREEN
+let allSafe = true;
+for(let i=1;i<=15;i++){
+  if(getStatus(levels[i]) !== "normal"){
+    allSafe = false;
+    break;
+  }
+}
+
+// PATH DISPLAY LOGIC
+if(allSafe){
+  document.getElementById("recommend").innerText =
+    "All manholes are safe ✅ — No path needed";
+}
+else{
   let p = getDynamicPath();
   document.getElementById("recommend").innerText =
     p ? "Recommended Path: " + p.map(n=>"MH"+n).join(" → ")
       : "No Safe Path Available!";
+}
   console.log("Start:", start, "Target:", target);
 }
 
