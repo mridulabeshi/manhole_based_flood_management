@@ -16,6 +16,7 @@ Urban flooding is a major challenge due to poor drainage monitoring and delayed 
 ---
 
 ## ⚙️ System Architecture
+![Setup](Setup.jpeg)
 
 ```
 Ultrasonic Sensor → ESP32 Node → WiFi (HTTP) → Cloud Server → Dashboard + Decision System
@@ -108,7 +109,7 @@ else
 ---
 
 ## 📊 Dashboard Features
-
+![Simulation](Simulation.png)
 * Live manhole status visualization
 * Color-coded nodes (Green / Orange / Red)
 * Dynamic updates every few seconds
@@ -137,7 +138,7 @@ else
 ---
 
 ## 👩‍💻 Authors
-
+![Team](Team.png)
 * Mridula B
 * Shreya Ranjitha M
 * Prithivisree S
