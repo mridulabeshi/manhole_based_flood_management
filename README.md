@@ -138,7 +138,7 @@ else
 ---
 
 ## 👩‍💻 Authors
-![Team](Team.png)
+![Team](Team.jpeg)
 * Mridula B
 * Shreya Ranjitha M
 * Prithivisree S
