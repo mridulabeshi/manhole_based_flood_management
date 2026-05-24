@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-  <title>Neerazhi - Smart Drainage Intelligence</title>
+
+  <title>Neerazhi - AI Smart Drainage System</title>
 
   <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
@@ -10,21 +12,20 @@
     body{
       margin:0;
       background:#0f172a;
-      color:white;
       font-family:'Segoe UI';
-      text-align:center;
+      color:white;
+      overflow:hidden;
     }
 
     h1{
-      margin-top:15px;
+      text-align:center;
       color:#38bdf8;
+      margin-top:10px;
     }
 
-    #network{
-      height:500px;
-      margin:20px;
-      background:#020617;
-      border-radius:12px;
+    .topbar{
+      text-align:center;
+      margin-bottom:10px;
     }
 
     button{
@@ -37,54 +38,154 @@
       margin:10px;
     }
 
-    #recommend{
-      margin-top:10px;
+    .container{
+      display:flex;
+      gap:20px;
+      padding:15px;
+    }
+
+    .panel{
+      flex:1;
+    }
+
+    .title{
+      text-align:center;
+      font-size:22px;
+      margin-bottom:10px;
+      color:#f8fafc;
+    }
+
+    #currentNetwork,
+    #predictedNetwork{
+      height:520px;
+      background:#020617;
+      border-radius:12px;
+      border:1px solid #1e293b;
+    }
+
+    #bottomPanel{
+      padding:15px;
+      display:flex;
+      justify-content:space-around;
       font-size:18px;
-      color:#38bdf8;
+      background:#111827;
+      margin:10px;
+      border-radius:10px;
+    }
+
+    .card{
+      width:30%;
+      text-align:center;
+    }
+
+    .danger{
+      color:#ef4444;
+      font-weight:bold;
+    }
+
+    .safe{
+      color:#22c55e;
+      font-weight:bold;
+    }
+
+    .warning{
+      color:#facc15;
+      font-weight:bold;
     }
 
     #infoPanel{
       position:fixed;
       right:20px;
-      top:80px;
-      width:270px;
+      top:100px;
+      width:280px;
       background:#111827;
       border-radius:12px;
       padding:15px;
-      text-align:left;
       display:none;
-    }
-
-    #dnviPanel{
-      margin-top:10px;
-      color:#facc15;
-      font-size:18px;
+      z-index:999;
+      border:1px solid #334155;
     }
 
   </style>
+
 </head>
 
 <body>
 
-<h1>Neerazhi</h1>
+<h1>Neerazhi - Smart Drainage Intelligence</h1>
 
-<button onclick="toggleRain()">🌧 Toggle Rain</button>
+<div class="topbar">
 
-<div id="recommend">Optimal Safe Path: --</div>
+  <button onclick="toggleRain()">
+    🌧 Toggle Rain
+  </button>
 
-<div id="dnviPanel"></div>
+</div>
 
-<div id="network"></div>
+<div class="container">
+
+  <div class="panel">
+
+    <div class="title">
+      Current Drainage Network
+    </div>
+
+    <div id="currentNetwork"></div>
+
+  </div>
+
+  <div class="panel">
+
+    <div class="title">
+      Predicted Flood Map (15 mins)
+    </div>
+
+    <div id="predictedNetwork"></div>
+
+  </div>
+
+</div>
+
+<div id="bottomPanel">
+
+  <div class="card">
+
+    <h3>Optimal Safe Path</h3>
+
+    <div id="pathText">--</div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>Critical Vulnerable Nodes</h3>
+
+    <div id="dnviText">--</div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>Rain Status</h3>
+
+    <div id="rainText" class="safe">
+      OFF ☀
+    </div>
+
+  </div>
+
+</div>
 
 <div id="infoPanel"></div>
 
 <script>
 
-// ========================
-// NODES
-// ========================
+// =====================================
+// BASE NODE DATA
+// =====================================
 
-const nodes = new vis.DataSet([
+const baseNodes = [
+
   {id:1,x:-320,y:-120},
   {id:2,x:-180,y:-180},
   {id:3,x:-20,y:-140},
@@ -103,14 +204,43 @@ const nodes = new vis.DataSet([
   {id:14,x:220,y:170},
   {id:15,x:350,y:210}
 
-].map(n => ({
-  ...n,
-  label:"MH"+n.id
-})));
+];
 
-// ========================
-// EDGES
-// ========================
+// =====================================
+// CURRENT NODES
+// =====================================
+
+const currentNodes = new vis.DataSet(
+
+  baseNodes.map(n=>({
+
+    ...n,
+
+    label:"MH"+n.id
+
+  }))
+);
+
+// =====================================
+// PREDICTED NODES
+// =====================================
+
+const predictedNodes = new vis.DataSet(
+
+  JSON.parse(
+    JSON.stringify(baseNodes)
+  ).map(n=>({
+
+    ...n,
+
+    label:"MH"+n.id
+
+  }))
+);
+
+// =====================================
+// EDGE DATA
+// =====================================
 
 const edgeArray = [
 
@@ -147,39 +277,100 @@ const edgeArray = [
   {from:9,to:13}
 
 ].map((e,i)=>({
+
   id:i+1,
+
   ...e,
+
+  arrows:"to",
+
   capacity:100,
+
   currentCapacity:100
+
 }));
 
-const edges = new vis.DataSet(edgeArray);
+// =====================================
+// EDGESETS
+// =====================================
 
-// ========================
-// NETWORK
-// ========================
+const currentEdges =
+  new vis.DataSet(edgeArray);
 
-const network = new vis.Network(
-  document.getElementById("network"),
-  {nodes,edges},
-  {
-    physics:false,
+const predictedEdges =
+  new vis.DataSet(
+    JSON.parse(JSON.stringify(edgeArray))
+  );
 
-    nodes:{
-      shape:"dot",
-      size:20,
-      font:{color:"white"}
+// =====================================
+// NETWORK OPTIONS
+// =====================================
+
+const options = {
+
+  physics:false,
+
+  nodes:{
+
+    shape:"dot",
+
+    size:22,
+
+    font:{
+      color:"white",
+      size:16
     },
 
-    edges:{
-      color:"#64748b"
-    }
+    borderWidth:2
+  },
+
+  edges:{
+
+    color:"#64748b",
+
+    width:2,
+
+    smooth:true
   }
+};
+
+// =====================================
+// CREATE NETWORKS
+// =====================================
+
+const currentNetwork =
+  new vis.Network(
+
+    document.getElementById(
+      "currentNetwork"
+    ),
+
+    {
+      nodes:currentNodes,
+      edges:currentEdges
+    },
+
+    options
 );
 
-// ========================
-// STATE
-// ========================
+const predictedNetwork =
+  new vis.Network(
+
+    document.getElementById(
+      "predictedNetwork"
+    ),
+
+    {
+      nodes:predictedNodes,
+      edges:predictedEdges
+    },
+
+    options
+);
+
+// =====================================
+// GLOBAL STATE
+// =====================================
 
 let rain = false;
 
@@ -190,120 +381,149 @@ let blockageScores = {};
 
 for(let i=1;i<=15;i++){
 
-  levels[i] = 20 + Math.random()*20;
+  levels[i] =
+    20 + Math.random()*20;
 
-  previousLevels[i] = levels[i];
+  previousLevels[i] =
+    levels[i];
 
   riseRates[i] = 0;
 
-  blockageScores[i] = Math.random()*15;
+  blockageScores[i] =
+    Math.random()*15;
 }
 
-// ========================
-// DETAILS
-// ========================
-
-function getDetails(id){
-
-  return{
-    serial:"SN-"+(1000+id),
-    volume:(50+id*5)+" m³",
-    zone:"Zone "+((id%5)+1),
-    predicted:Math.floor(predictLevel(id))+"%"
-  };
-}
-
-// ========================
-// STATUS
-// ========================
-
-function getStatus(level){
-
-  if(level < 35) return "safe";
-
-  if(level < 60) return "warning";
-
-  if(level < 80) return "high";
-
-  return "critical";
-}
-
-// ========================
-// COLORS
-// ========================
-
-function getRiskColor(risk){
-
-  if(risk < 30) return "#22c55e";
-
-  if(risk < 50) return "#eab308";
-
-  if(risk < 70) return "#f97316";
-
-  return "#ef4444";
-}
-
-// ========================
-// TOGGLE RAIN
-// ========================
+// =====================================
+// RAIN TOGGLE
+// =====================================
 
 function toggleRain(){
 
   rain = !rain;
 
-  alert(rain ? "Rain Enabled 🌧" : "Rain Disabled ☀");
+  let rainText =
+    document.getElementById(
+      "rainText"
+    );
+
+  if(rain){
+
+    rainText.innerHTML =
+      "ON 🌧";
+
+    rainText.className =
+      "danger";
+
+  }else{
+
+    rainText.innerHTML =
+      "OFF ☀";
+
+    rainText.className =
+      "safe";
+  }
 }
 
-// ========================
-// RISK
-// ========================
+// =====================================
+// STATUS
+// =====================================
+
+function getStatus(level){
+
+  if(level < 35)
+    return "safe";
+
+  if(level < 60)
+    return "warning";
+
+  if(level < 80)
+    return "high";
+
+  return "critical";
+}
+
+// =====================================
+// RISK COLOR
+// =====================================
+
+function getRiskColor(risk){
+
+  if(risk < 30)
+    return "#22c55e";
+
+  if(risk < 50)
+    return "#facc15";
+
+  if(risk < 70)
+    return "#f97316";
+
+  return "#ef4444";
+}
+
+// =====================================
+// CALCULATE RISK
+// =====================================
 
 function calculateRisk(id){
 
   return (
+
     0.5 * levels[id] +
+
     0.3 * riseRates[id] * 10 +
+
     0.2 * blockageScores[id]
   );
 }
 
-// ========================
-// PREDICTION
-// ========================
+// =====================================
+// PREDICT FUTURE LEVEL
+// =====================================
 
 function predictLevel(id){
 
-  return levels[id] + riseRates[id] * 5;
+  return levels[id] +
+         riseRates[id] * 5;
 }
 
-// ========================
+// =====================================
 // BUILD GRAPH
-// ========================
+// =====================================
 
 function buildGraph(){
 
   let g = {};
 
-  edges.forEach(e=>{
+  currentEdges.forEach(e=>{
 
-    if(!g[e.from]) g[e.from] = [];
+    if(!g[e.from])
+      g[e.from] = [];
 
-    if(!g[e.to]) g[e.to] = [];
+    if(!g[e.to])
+      g[e.to] = [];
 
-    let congestion = 100 - e.currentCapacity;
+    let congestion =
+      100 - e.currentCapacity;
 
     let cost =
+
       1 +
+
       calculateRisk(e.to)/20 +
-      congestion/50;
+
+      congestion/40;
 
     g[e.from].push({
+
       node:e.to,
+
       cost
     });
 
     g[e.to].push({
+
       node:e.from,
+
       cost
     });
   });
@@ -311,11 +531,11 @@ function buildGraph(){
   return g;
 }
 
-// ========================
+// =====================================
 // DIJKSTRA
-// ========================
+// =====================================
 
-function getOptimalSafePath(){
+function getOptimalPath(){
 
   let graph = buildGraph();
 
@@ -327,6 +547,7 @@ function getOptimalSafePath(){
     if(levels[i] > max){
 
       max = levels[i];
+
       start = i;
     }
   }
@@ -339,6 +560,7 @@ function getOptimalSafePath(){
     if(levels[i] < min){
 
       min = levels[i];
+
       target = i;
     }
   }
@@ -359,25 +581,36 @@ function getOptimalSafePath(){
 
     for(let i=1;i<=15;i++){
 
-      if(!visited.has(i) && dist[i] < best){
+      if(
+        !visited.has(i) &&
+        dist[i] < best
+      ){
 
         best = dist[i];
+
         current = i;
       }
     }
 
-    if(current === null) break;
+    if(current === null)
+      break;
 
-    if(current === target) break;
+    if(current === target)
+      break;
 
     visited.add(current);
 
     for(let nei of graph[current]){
 
-      if(getStatus(levels[nei.node]) === "critical")
+      if(
+        getStatus(levels[nei.node])
+        === "critical"
+      )
         continue;
 
-      let nd = dist[current] + nei.cost;
+      let nd =
+        dist[current] +
+        nei.cost;
 
       if(nd < dist[nei.node]){
 
@@ -405,30 +638,35 @@ function getOptimalSafePath(){
   return path;
 }
 
-// ========================
-// UPDATE EDGE CAPACITY
-// ========================
+// =====================================
+// EDGE CAPACITY UPDATE
+// =====================================
 
 function updateCapacities(){
 
-  edges.forEach(e=>{
+  currentEdges.forEach(e=>{
 
     let nearbyRisk =
+
       (
         calculateRisk(e.from) +
         calculateRisk(e.to)
       ) / 2;
 
     e.currentCapacity =
-      Math.max(10, 100 - nearbyRisk);
 
-    edges.update(e);
+      Math.max(
+        10,
+        100 - nearbyRisk
+      );
+
+    currentEdges.update(e);
   });
 }
 
-// ========================
+// =====================================
 // DNVI
-// ========================
+// =====================================
 
 function computeDNVI(){
 
@@ -437,73 +675,104 @@ function computeDNVI(){
   for(let i=1;i<=15;i++){
 
     let connectivity =
+
       buildGraph()[i].length;
 
     let dnvi =
+
       calculateRisk(i) *
       connectivity;
 
     arr.push({
+
       id:i,
+
       score:dnvi
     });
   }
 
-  arr.sort((a,b)=>b.score-a.score);
+  arr.sort(
+    (a,b)=>
+    b.score-a.score
+  );
 
   return arr.slice(0,3);
 }
 
-// ========================
-// NODE CLICK
-// ========================
+// =====================================
+// INFO PANEL
+// =====================================
 
-network.on("click", function(params){
+function showInfo(id){
 
-  if(params.nodes.length){
+  let predicted =
+    predictLevel(id);
 
-    let id = params.nodes[0];
+  document.getElementById(
+    "infoPanel"
+  ).style.display = "block";
 
-    let d = getDetails(id);
+  document.getElementById(
+    "infoPanel"
+  ).innerHTML = `
 
-    document.getElementById(
-      "infoPanel"
-    ).style.display="block";
+    <h2>MH${id}</h2>
 
-    document.getElementById(
-      "infoPanel"
-    ).innerHTML = `
+    <p>
+      <b>Current Level:</b>
+      ${Math.floor(levels[id])}%
+    </p>
 
-      <h2>MH${id}</h2>
+    <p>
+      <b>Predicted Level:</b>
+      ${Math.floor(predicted)}%
+    </p>
 
-      <p><b>Serial:</b> ${d.serial}</p>
+    <p>
+      <b>Rise Rate:</b>
+      ${riseRates[id].toFixed(2)}
+    </p>
 
-      <p><b>Volume:</b> ${d.volume}</p>
+    <p>
+      <b>Risk Score:</b>
+      ${Math.floor(
+        calculateRisk(id)
+      )}
+    </p>
 
-      <p><b>Zone:</b> ${d.zone}</p>
+    <p>
+      <b>Status:</b>
+      ${getStatus(levels[id])}
+    </p>
 
-      <p><b>Current:</b> ${Math.floor(levels[id])}%</p>
+  `;
+}
 
-      <p><b>Predicted:</b> ${d.predicted}</p>
+currentNetwork.on(
+  "click",
+  function(params){
 
-      <p><b>Risk:</b> ${Math.floor(calculateRisk(id))}</p>
+    if(params.nodes.length){
 
-      <p><b>Rise Rate:</b>
-      ${riseRates[id].toFixed(2)}</p>
-
-    `;
+      showInfo(
+        params.nodes[0]
+      );
+    }
   }
-});
+);
 
-// ========================
-// MAIN UPDATE LOOP
-// ========================
+// =====================================
+// UPDATE LOOP
+// =====================================
 
 function update(){
 
+  // UPDATE WATER LEVELS
+
   for(let i=1;i<=15;i++){
 
-    previousLevels[i] = levels[i];
+    previousLevels[i] =
+      levels[i];
 
     if(rain){
 
@@ -517,20 +786,30 @@ function update(){
     }
 
     levels[i] =
-      Math.max(5,
-      Math.min(100, levels[i]));
+
+      Math.max(
+        5,
+        Math.min(100, levels[i])
+      );
 
     riseRates[i] =
+
       levels[i] -
       previousLevels[i];
+  }
+
+  // UPDATE EDGE CAPACITY
+
+  updateCapacities();
+
+  // UPDATE CURRENT MAP
+
+  for(let i=1;i<=15;i++){
 
     let risk =
       calculateRisk(i);
 
-    let color =
-      getRiskColor(risk);
-
-    nodes.update({
+    currentNodes.update({
 
       id:i,
 
@@ -538,32 +817,58 @@ function update(){
         `MH${i}\n` +
         `${Math.floor(levels[i])}%`,
 
-      color
+      color:getRiskColor(risk),
+
+      borderWidth:
+        getStatus(levels[i])
+        === "critical"
+        ? 5 : 2
     });
   }
 
-  updateCapacities();
+  // UPDATE PREDICTED MAP
+
+  for(let i=1;i<=15;i++){
+
+    let predicted =
+      predictLevel(i);
+
+    predictedNodes.update({
+
+      id:i,
+
+      label:
+        `MH${i}\n` +
+        `${Math.floor(predicted)}%`,
+
+      color:getRiskColor(predicted),
+
+      borderWidth:
+        predicted > 80
+        ? 5 : 2
+    });
+  }
 
   // PATH
 
   let path =
-    getOptimalSafePath();
+    getOptimalPath();
 
   document.getElementById(
-    "recommend"
-  ).innerText =
+    "pathText"
+  ).innerHTML =
 
     path
+
     ?
 
-    "Optimal Safe Path: " +
-
-    path.map(n=>"MH"+n)
-    .join(" → ")
+    path.map(
+      x=>"MH"+x
+    ).join(" → ")
 
     :
 
-    "No Safe Path Available!";
+    "<span class='danger'>No Safe Path</span>";
 
   // DNVI
 
@@ -571,10 +876,8 @@ function update(){
     computeDNVI();
 
   document.getElementById(
-    "dnviPanel"
+    "dnviText"
   ).innerHTML =
-
-    "Critical Vulnerable Nodes: " +
 
     critical.map(
       x=>"MH"+x.id
@@ -586,4 +889,5 @@ setInterval(update,2000);
 </script>
 
 </body>
+
 </html>
